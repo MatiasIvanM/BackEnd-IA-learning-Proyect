@@ -18,22 +18,21 @@ export class GptController {
     return this.gptService.prosConsDicusser(prosConsDiscusserDto);
   }
 
-  @Post("pros-cons-discusser-stream")
+ @Post('pros-cons-discusser-stream')
   async prosConsDicusserStream(
     @Body() prosConsDiscusserDto: ProsConsDiscusserDto,
-    @Res() res: Response
+    @Res() res: Response,
   ) {
+     const stream = await this.gptService.prosConsDicusserStream(prosConsDiscusserDto);
 
-    const stream = await this.gptService.prosConsDicusserStream(prosConsDiscusserDto);
+  
+    res.setHeader('Content-Type', 'application/json');
+    res.status( HttpStatus.OK );
 
-    res.setHeader ('Content-Type', 'application/json');
-    res.status ( HttpStatus.OK );
-
-    for await (const chunk of stream ) {
-    
-      const pieces = chunk.choices[0].delta.content || '';
-      // console.log("🚀 ~ GptController ~ forawait ~ pieces:", pieces)
-      res.write(pieces);
+    for await( const chunk of stream ) {
+      const piece = chunk.choices[0].delta.content || '';
+      // console.log(piece);
+      res.write(piece);
     }
 
     res.end();

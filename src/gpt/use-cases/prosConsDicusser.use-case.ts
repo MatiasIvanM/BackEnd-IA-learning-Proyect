@@ -24,10 +24,10 @@ export const prosConsDicusserUseCase = async ( openai: OpenAI, { prompt }: Optio
     ],
     model: "gpt-4o",
     temperature: 0.8,
-    max_tokens: 250,
+    max_tokens: 500,
 
   });
-  console.log("🚀 ~ prosConsDicusserUseCase ~ completion:", completion)
+  // console.log("🚀 ~ prosConsDicusserUseCase ~ completion:", completion)
 
   return completion.choices[0].message;
 
