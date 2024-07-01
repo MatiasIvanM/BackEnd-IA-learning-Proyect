@@ -1,4 +1,4 @@
-import { response } from "express";
+
 import OpenAI from "openai";
 
 interface Options {
