@@ -16,7 +16,7 @@ export const translateUseCase = async (openai: OpenAI, { prompt, lang }: Options
       },
     ],
     temperature: 0.2,
-    // max_tokens: 500,
+
   });
 
 };
