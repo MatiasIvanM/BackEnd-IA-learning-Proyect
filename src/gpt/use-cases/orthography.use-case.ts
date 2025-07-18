@@ -19,9 +19,6 @@ export const orthographyChecUseCase = async (
         Debes responder en formato JSON,
         Tu tarea es corregir y retornar información de las soluciones y el texto original con sus correcciones,
         También debes de dar un porcentaje de aciertos por el usuario,
-
-        
-        
         
         Si no hay errreos, debes retornar un mensaje de felicitaciones.
         
@@ -48,7 +45,6 @@ export const orthographyChecUseCase = async (
     //     type: "json_object"
     // }
   });
-//   console.log("🚀 ~ completion:", completion);
 
   return JSON.parse(completion.choices[0].message.content);
 };

@@ -17,6 +17,8 @@ import type { Response } from 'express';
 import { diskStorage } from 'multer';
 import { AudioToTextDto, orthographyDto, ProsConsDiscusserDto, TextToAudioDto, TranslateDto } from './dtos';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { InformeCalidadDto } from './dtos/InformeCalidad.dto';
+import { generatePdfBuffer, generatePdfFile } from './helpers/pdf-generator';
 
 // Recibe la informacion y manda llamar los servicios
 @Controller('gpt')
@@ -86,8 +88,7 @@ export class GptController {
       storage: diskStorage({
         destination: './generated/uploads',
         filename: (req, file, callback) => {
-          const fileExtension = file.originalname.split('.').pop();
-          const fileName = `${new Date().getTime()}.${fileExtension}`;
+          const fileName = file.originalname;
           return callback(null, fileName);
         },
       }),
@@ -103,9 +104,102 @@ export class GptController {
       })
     )
     file: Express.Multer.File,
-    @Body() audioToTextDto:AudioToTextDto,
+    @Body() audioToTextDto: AudioToTextDto
   ) {
-    // console.log(AudioToTextDto);
     return this.gptService.audioToText(file, audioToTextDto);
   }
+
+  @Post('informe-calidad')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './generated/audios',
+        filename: (req, file, callback) => {
+          const fileName = file.originalname;
+          return callback(null, fileName);
+        },
+      }),
+    })
+  )
+  async informeCalidadStream(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 1000 * 1024 * 25, message: 'File is bigger than 25 mb ' }),
+          new FileTypeValidator({ fileType: 'audio/*' }),
+        ],
+      })
+    )
+    file: Express.Multer.File,
+    @Body() dto: InformeCalidadDto,
+    @Res() res: Response
+  ) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    try {
+      const { transcription, analysisStream } = await this.gptService.informeCalidad(file, dto);
+
+      let fullText = '';
+
+      // Stream SSE chunks
+      for await (const chunk of analysisStream) {
+        const delta = chunk.choices?.[0]?.delta?.content;
+        if (delta) {
+          res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
+          fullText += delta;
+        }
+      }
+
+      // Cuando termina el stream, generamos el PDF con todo el análisis
+      const pdfBuffer = await generatePdfBuffer(fullText);
+      const pdfFilename = `informe-${Date.now()}.pdf`;
+      const pdfUrl = await generatePdfFile(fullText, pdfFilename);
+
+
+      // Enviamos evento final con PDF base64 y transcripción
+      res.write(
+        `data: ${JSON.stringify({
+          event: 'end',
+          pdfBase64: pdfBuffer.toString('base64'),
+          transcription,
+          pdfUrl,
+        })}\n\n`
+      );
+
+      res.end();
+    } catch (error) {
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    }
+  }
+
+  // @Post('informe-calidad')
+  // @UseInterceptors(
+  //   FileInterceptor('file', {
+  //     storage: diskStorage({
+  //       destination: './generated/informes-calidad',
+  //       filename: (req, file, callback) => {
+  //         // const fileExtension = file.originalname.split('.').pop();
+  //         const fileName = file.originalname;
+  //         return callback(null, fileName);
+  //       },
+  //     }),
+  //   })
+  // )
+  // async informeCalidad(
+  //   @UploadedFile(
+  //     new ParseFilePipe({
+  //       validators: [
+  //         new MaxFileSizeValidator({ maxSize: 1000 * 1024 * 25, message: 'File is bigger than 25 mb ' }),
+  //         new FileTypeValidator({ fileType: 'audio/*' }),
+  //       ],
+  //     })
+  //   )
+  //   file: Express.Multer.File,
+  //   @Body() informeCalidadDto: InformeCalidadDto
+  // ) {
+  //   return this.gptService.informeCalidad(file, informeCalidadDto);
+  // }
 }
